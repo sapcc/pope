@@ -1,6 +1,8 @@
 # pope
 [P]ostgres [O]perator [P]rometheus [E]xporter
 
+This is a prometheus exporter for the zalando postgres exporter!
+
 Exports the following metrics:
 
 name: 'pg_operator_cluster_synced',
