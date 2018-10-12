@@ -6,7 +6,7 @@ const Metrics = require('./metrics');
 const server = express();
 const PORT = process.env.PORT || 9290;
 const HOST = '0.0.0.0';
-const OPERATOR_URL = process.env.OPERATOR_URL || "http://ipmi-exporter:8080";
+const OPERATOR_URL = process.env.OPERATOR_URL || "http://localhost:8080";
 
 let metrics = new Metrics(OPERATOR_URL);
 
