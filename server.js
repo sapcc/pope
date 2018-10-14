@@ -10,15 +10,14 @@ const OPERATOR_URL = process.env.OPERATOR_URL || "http://localhost:8080";
 
 let metrics = new Metrics(OPERATOR_URL);
 
-server.get('/metrics', (req, res) => {
+server.get('/metrics', async (req, res) => {
     res.set('Content-Type', register.contentType);
-    metrics.loadAllMetrics()
-    .then(g => {
+    try {
+        await metrics.loadAllMetrics();
         res.end(register.metrics());
-    })
-    .catch(e => {
+    } catch(err) {
         res.status(500).end();
-    });
+    }
 });
 
 server.listen(PORT, HOST);

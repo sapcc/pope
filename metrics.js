@@ -1,6 +1,9 @@
 const fetch   = require('node-fetch');
 const MetricsConfig = require('./metricsConfig');
 
+//TODO: ,"Message":"performing rolling update"}
+//TODO: is not in the desired state and needs to be updated"
+//TODO: worker logs: "Message":"deletion of the cluster started" / Message":"\"DELETE\" event has been queued"
 
 class FetchError extends Error {
     constructor(message, status) {
@@ -12,138 +15,164 @@ class FetchError extends Error {
     }
 }
 
+class NoClusterError extends Error {
+    constructor(message, team, cluster) {
+        super(message);
+
+        this.message = message;
+        this.team = team;
+        this.cluster = cluster;
+        this.name = this.constructor.name;
+    }
+}
+
 module.exports = class Metrics {
     constructor(operator_url) {
         this.operator_url = operator_url;
         this.clusters = {};
     }
 
-    loadAllMetrics() {
+    async loadAllMetrics() {
         this.clusters = {};
-        return this._getClusters().then(() => {
-            return Promise.all([
-                this.loadWorkerQueues(),
-                this.loadClusterStatus(),
-                this.loadClusterSyncAndErrors()
-            ]);
-        })
+        try {
+            await this._getClusters();
+            await this.loadWorkerQueues();
+            await this.loadClusterStatus();
+            await this.loadClusterSyncAndErrors();
+        } catch(err) {
+            console.log(err);
+            if (err instanceof NoClusterError) {
+                this._setClusterCount();
+            }
+        }
     }
 
-    loadWorkerQueues() {
+    async loadWorkerQueues() {
         const url = `${this.operator_url}/workers/all/queue/`;
-        return fetchOperatorData(url)
-            .then(workers => {
-                for (let id in workers) {
-                    MetricsConfig.gWorkerQueueSize.labels(id).set(workers[id].List.length);
-                }
-            })
-            .catch(err => {
-                console.error("error loadWorkerQueues", err);
-        }); 
+        try {
+            let workers = await fetchOperatorData(url);
+            for (let id in workers) {
+                MetricsConfig.gWorkerQueueSize.labels(id).set(workers[id].List.length);
+            }
+        } catch(err) {
+            console.error("error loadWorkerQueues", err);
+        }
     }
     
-    loadClusterSyncAndErrors() {
-        return this._getClusters()
-            .then(clusters => {
-                let syncPromise = [];
-                for (let team in clusters) {
-                    clusters[team].forEach(name => {
-                        //Team => namespace
-                        syncPromise.push(this._getClusterLogs(team, name, team));
-                    })
+    async loadClusterSyncAndErrors() {
+        try {
+            let clusters = await this._getClusters();
+            let syncPromise = [];
+            for (let team in clusters) {
+                clusters[team].forEach(name => {
+                    //Team => namespace
+                    syncPromise.push(this._getClusterLogs(team, name, team));
+                })
+            }
+            for (let p in syncPromise) {
+                try {
+                    this._setClusterSync(await syncPromise[p]);
+                    this._setClusterErrors(await syncPromise[p]);
+                } catch(err) {
+                    console.error("error loadClusterSync", err)
                 }
-                return Promise.all(syncPromise).then(logs => {
-                    this._setClusterSync(logs);
-                    this._setClusterErrors(logs);
-                });
-            })
-            .catch(err => {
-                console.error("error loadClusterSync", err);
-        }); 
+            }
+        } catch(err) {
+            console.error("error loadClusterSync", err);
+        }
     }
     
-    loadClusterStatus() {
-        return this._getClusters()
-            .then(clusters => {
-                let statusPromise = [];
-                for (let team in clusters) {
-                    clusters[team].forEach(name => {
-                        //Team => namespace
-                        statusPromise.push(this._getClusterStatus(team, name, team));
-                    })
+    async loadClusterStatus() {
+        try {
+            this._setClusterCount();
+            let clusters = await this._getClusters();
+            let statusPromise = [];
+            for (let team in clusters) {
+                clusters[team].forEach(name => {
+                    //Team => namespace
+                    statusPromise.push(this._getClusterStatus(team, name, team));
+                })
+            }
+            for (let p in statusPromise) {
+                try {
+                    this._setClusterStatus(await statusPromise[p]);
+                } catch(err) {
+                    if (err instanceof NoClusterError) {
+                        this._setClusterStatus({status: {Status: "Invalid"}, team: err.team, name: err.cluster});
+                    }
+                    console.error("error loadClusterStatus", err)
                 }
-                return Promise.all(statusPromise).then(this._setClusterStatus);
-            })
-            .catch(err => {
-                console.error("error loadClusterStatus", err);
-            });
+            }
+        } catch(err) {
+            console.error("error loadClusterStatus", err);
+        }
     }
 
-    _getClusters() {
+    async _getClusters() {
         const url = `${this.operator_url}/clusters/`;
         if (Object.keys(this.clusters).length > 0) {
             return Promise.resolve(this.clusters);
         }
-        return fetchOperatorData(url)
-            .then(clusters =>  {
-                this.clusters = clusters;
-                return clusters;
-            });
+        let clusters = await fetchOperatorData(url);
+        if (Object.keys(clusters).length === 0) {
+            throw new NoClusterError();
+        }
+        this.clusters = clusters;
+        return clusters;
     }
     
-    _getClusterStatus(team, name, namespace) {
+    async _getClusterStatus(team, name, namespace) {
         const url = `${this.operator_url}/clusters/${team}/${namespace}/${name}/`;
-        return fetchOperatorData(url)
-            .then(json => {
-                return {status: json, team: team, name: name}
-            });
+        let json = await fetchOperatorData(url, team, name);
+        return {status: json, team: team, name: name}
     }
 
-    _getClusterLogs(team, name, namespace) {
+    async _getClusterLogs(team, name, namespace) {
         const url = `${this.operator_url}/clusters/${team}/${namespace}/${name}/logs`;
-        return fetchOperatorData(url)
-            .then(json => {
-                return {status: json, team: team, name: name}
-            });
+        let json = await fetchOperatorData(url, team, name);
+        return {status: json, team: team, name: name}
     }
 
-    _setClusterSync(logs) {
-        logs.forEach(log => {
-            if (log && log.status.length === 0) {
-                return
-            }
-            log.status.forEach(l => {
-                if (l.Message === 'cluster has been synced') {
-                    MetricsConfig.gClusterSync.labels(log.team, log.name).set(Date.parse(l.Time));
-                }
-            });
-        });
+    _setClusterCount() {
+        let count = 0;
+        for (let team in  this.clusters) {
+            count = count + this.clusters[team].length;
+            MetricsConfig.gClusterCount.labels(team).set(this.clusters[team].length);
+        }
+        MetricsConfig.gClusterCount.labels("total").set(count)
     }
 
-    _setClusterStatus(clusters) {
-        clusters.forEach(cluster => {
-            for (let status in MetricsConfig.gClusterStatus) {
-                if (MetricsConfig.gClusterStatus[cluster.status.Status]) {
-                    const gStatus = MetricsConfig.gClusterStatus[cluster.status.Status];
-                    gStatus.labels(cluster.team, cluster.name, cluster.status.Worker).set(1);
-                }
-                MetricsConfig.gClusterStatus[status].labels(cluster.team, cluster.name, cluster.status.Worker).set(0);
+    _setClusterSync(log) {
+        if (!log || !log.status || log.status.length === 0) {
+            return
+        }
+        log.status.forEach(l => {
+            if (l.Message === 'cluster has been synced') {
+                MetricsConfig.gClusterSync.labels(log.team, log.name).set(Date.parse(l.Time));
             }
         });
     }
 
-    _setClusterErrors(logs) {
-        logs.forEach(log => {
-            if (log.status && log.status.length === 0) {
-                return
+    _setClusterStatus(cluster) {
+        for (let status in MetricsConfig.gClusterStatus) {
+            if (status === cluster.status.Status) {
+                const gStatus = MetricsConfig.gClusterStatus[cluster.status.Status];
+                gStatus.labels(cluster.team, cluster.name).set(1);
+            } else {
+                MetricsConfig.gClusterStatus[status].labels(cluster.team, cluster.name).set(0);
             }
- 
-            log.status.forEach(l => {
-                if (l.Level === 2) {
-                    const errorCode = this._checkForErrorCodes(l.Message);
-                    MetricsConfig.gClusterError.labels(log.team, log.name).set(errorCode);
-                }
-            });
+        }
+    }
+
+    _setClusterErrors(log) {
+        if (!log || !log.status || log.status.length === 0) {
+            return
+        }
+        log.status.forEach(l => {
+            if (l.Level === 2) {
+                const errorCode = this._checkForErrorCodes(l.Message);
+                MetricsConfig.gClusterError.labels(log.team, log.name).set(errorCode);
+            }
         });
     }
 
@@ -161,16 +190,20 @@ module.exports = class Metrics {
     }
 }
 
-function fetchOperatorData(url) {
-    return fetch(url)
-        .then(checkStatus)
-        .then(res => res.json());
+async function fetchOperatorData(url, team, cluster) {
+    let res = await fetch(url);
+    await checkStatus(res, team, cluster);
+    return res.json();
 }
 
-function checkStatus(res) {
+async function checkStatus(res, team, cluster) {
     if (res.ok) { // res.status >= 200 && res.status < 300
         return res;
     } else {
+        let err = await res.json();
+        if (err.error === "could not find cluster") {
+            throw new NoClusterError(res.statusText, team, cluster);
+        }
         throw new FetchError(res.statusText, res.status);
     }
 }
