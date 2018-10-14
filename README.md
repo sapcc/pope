@@ -1,7 +1,7 @@
 # pope
 [P]ostgres [O]perator [P]rometheus [E]xporter
 
-This is a prometheus exporter for the zalando postgres operator!
+This is a prometheus exporter for the zalando [postgres operator](https://github.com/sapcc/postgres-operator)!
 
 It shows the status of deployed postgres clusters.
 
