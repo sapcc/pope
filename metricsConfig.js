@@ -24,7 +24,7 @@ const gWorkerQueueSize = new Gauge({
 const gClusterCount = new Gauge({
 	name: 'pg_operator_cluster_count',
 	help: 'Shows the current number of clusters',
-	labelNames: ['teamAPI']
+	labelNames: ['name']
 });
 
 const gClusterStatusRunning = new Gauge({
