@@ -85,6 +85,7 @@ module.exports = class Metrics {
     async loadClusterStatus() {
         try {
             this._setClusterCount();
+            MetricsConfig.gClusterStatus.reset();
             let clusters = await this._getClusters();
             let statusPromise = [];
             for (let team in clusters) {
@@ -135,7 +136,7 @@ module.exports = class Metrics {
 
     _setClusterCount() {
         let count = 0;
-        for (let team in  this.clusters) {
+        for (let team in this.clusters) {
             count = count + this.clusters[team].length;
             MetricsConfig.gClusterCount.labels(team).set(this.clusters[team].length);
         }
