@@ -154,14 +154,11 @@ module.exports = class Metrics {
     }
 
     _setClusterStatus(cluster) {
-        for (let status in MetricsConfig.gClusterStatus) {
+        MetricsConfig.clusterStatus.forEach(status => {
             if (status === cluster.status.Status) {
-                const gStatus = MetricsConfig.gClusterStatus[cluster.status.Status];
-                gStatus.labels(cluster.team, cluster.name).set(1);
-            } else {
-                MetricsConfig.gClusterStatus[status].labels(cluster.team, cluster.name).set(0);
+                MetricsConfig.gClusterStatus.labels(cluster.team, cluster.name, status).set(1);
             }
-        }
+        });
     }
 
     _setClusterErrors(log) {
