@@ -43,6 +43,7 @@ module.exports = class Metrics {
             console.log(err);
             if (err instanceof NoClusterError) {
                 this._setClusterCount();
+                this.loadWorkerQueues();
             }
         }
     }
