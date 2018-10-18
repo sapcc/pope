@@ -36,15 +36,20 @@ module.exports = class Metrics {
         this.clusters = {};
         try {
             await this._getClusters();
-            await this.loadWorkerQueues();
-            await this.loadClusterStatus();
-            await this.loadClusterSyncAndErrors();
+            return [
+                this.loadWorkerQueues(),
+                this.loadClusterStatus(),
+                this.loadClusterSyncAndErrors()
+            ]
         } catch(err) {
-            console.log(err);
             if (err instanceof NoClusterError) {
-                this._setClusterCount();
-                this.loadWorkerQueues();
+                return [
+                    this._setClusterCount(),
+                    this.loadWorkerQueues()
+                ]
             }
+            console.log(err);
+            throw err;
         }
     }
 

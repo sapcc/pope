@@ -1,14 +1,38 @@
-function fetch(s) {
+const { PerformanceObserver, performance } = require('perf_hooks');
+const obs = new PerformanceObserver((items) => {
+    console.log(items.getEntries()[0].duration);
+    performance.clearMarks();
+});
+obs.observe({ entryTypes: ['measure'] });
+
+
+function fetch(s, timeout) {
     console.log("starting: ", s)
     return new Promise((rs, rj) => {
         setTimeout(() => {
             if (s === "3") {
-                rj("FUCK")
+                rj("DOH")
             }
             rs(s);
-        }, 1000)
+        }, timeout)
     })
 }
+
+async function callParallelAsync() {
+    await fetch("hihihih", 500)
+    return [fetch("blab", 5000), fetch("blub", 6000), fetch("blob", 4000)];
+}
+
+(async function() {
+    performance.mark('A');
+    let result = await callParallelAsync();
+    for (let r in result) {
+        console.log(": )")
+        await result[r];
+    }
+    performance.mark('B');
+    performance.measure('A to B', 'A', 'B');
+})();
 
 (async function() {
     ps =[]; 
@@ -29,7 +53,7 @@ function fetch(s) {
     }
     //await Promise.all()
     console.log("DONE")
-})();
+})
 
 async function logit (s) {
     console.log("LOG", s)
