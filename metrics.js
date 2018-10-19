@@ -163,7 +163,7 @@ module.exports = class Metrics {
     _setClusterStatus(cluster) {
         MetricsConfig.clusterStatus.forEach(status => {
             if (status === cluster.status.Status) {
-                MetricsConfig.gClusterStatus.labels(cluster.team, cluster.name, status).set(1);
+                MetricsConfig.gClusterStatus.labels(cluster.team, cluster.name, status,  this._getBucketID(cluster)).set(1);
             }
         });
     }
@@ -191,6 +191,24 @@ module.exports = class Metrics {
             return 2;
         }
         return 1;
+    }
+
+    _getBucketID(cluster) {
+        let postgres = cluster.status.StatefulSet.spec.template.spec.containers.find(c => {
+            if (c.name === "postgres") {
+                return true;
+            }
+        });
+        if (!postgres) {
+            return ""
+        }
+        let bucketID = postgres.env.find(e => {
+            if (e.name === "WAL_BUCKET_SCOPE_SUFFIX") {
+                return true;
+            }
+        });
+        bucketID = bucketID ? bucketID : "";
+        return bucketID.value.replace("/", "");
     }
 }
 

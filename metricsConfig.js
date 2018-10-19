@@ -2,6 +2,11 @@ const client  = require('prom-client');
 const Gauge = client.Gauge;
 
 
+const gOperatorUp = new Gauge({
+	name: 'pg_operator_up',
+	help: 'Shows if operator is up',
+	labelNames: []
+});
 
 const gClusterSync = new Gauge({
 	name: 'pg_operator_cluster_synced',
@@ -30,7 +35,7 @@ const gClusterCount = new Gauge({
 const gClusterStatus = new Gauge({
 	name: 'pg_operator_cluster_status',
 	help: 'Shows if the cluster is running (1)',
-	labelNames: ['teamAPI', 'clusterName', 'status']
+	labelNames: ['teamAPI', 'clusterName', 'status', 'buckedID']
 });
 
 clusterStatus = [
@@ -44,6 +49,7 @@ clusterStatus = [
 ]
 
 module.exports = {
+	gOperatorUp: gOperatorUp,
 	gClusterStatus: gClusterStatus,
 	clusterStatus: clusterStatus,
 	gClusterCount: gClusterCount,

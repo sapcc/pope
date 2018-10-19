@@ -20,15 +20,19 @@ function fetch(s, timeout) {
 
 async function callParallelAsync() {
     await fetch("hihihih", 500)
-    return [fetch("blab", 5000), fetch("blub", 6000), fetch("blob", 4000)];
+    return [fetch("blab", 5000), fetch("3", 6000), fetch("blob", 4000)];
 }
 
 (async function() {
     performance.mark('A');
     let result = await callParallelAsync();
-    for (let r in result) {
-        console.log(": )")
-        await result[r];
+    try {
+        for (let r in result) {
+            console.log(": )")
+            await result[r];
+        }
+    } catch(err) {
+        console.log("ERR", err)
     }
     performance.mark('B');
     performance.measure('A to B', 'A', 'B');

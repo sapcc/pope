@@ -2,6 +2,7 @@ const client  = require('prom-client');
 const register = client.register;
 const express = require('express');
 const Metrics = require('./metrics');
+const MetricsConfig = require('./metricsConfig');
 
 const server = express();
 const PORT = process.env.PORT || 9290;
@@ -17,11 +18,11 @@ server.get('/metrics', async (req, res) => {
         for (let i in result) {
             await result[i];
         }
-
-        res.end(register.metrics());
+        MetricsConfig.gOperatorUp.set(1);
     } catch(err) {
-        res.status(500).end();
+        MetricsConfig.gOperatorUp.set(0);
     }
+    res.end(register.metrics());
 });
 
 server.listen(PORT, HOST);
