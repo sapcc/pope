@@ -38,15 +38,15 @@ const gClusterStatus = new Gauge({
 	labelNames: ['teamAPI', 'clusterName', 'status', 'buckedID']
 });
 
-clusterStatus = [
-    "Running",
-    "Creating",
-    "Updating",
-    "UpdateFailed",
-    "CreateFailed",
-    "SyncFailed",
-    "Invalid"
-]
+clusterStatus = {
+    "Running": 0,
+    "Creating": 1,
+    "Updating": 2,
+    "UpdateFailed": 3,
+    "CreateFailed": 4,
+    "SyncFailed": 5,
+    "Invalid": 6
+}
 
 module.exports = {
 	gOperatorUp: gOperatorUp,

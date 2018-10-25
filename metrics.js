@@ -161,11 +161,17 @@ module.exports = class Metrics {
     }
 
     _setClusterStatus(cluster) {
-        MetricsConfig.clusterStatus.forEach(status => {
-            if (status === cluster.status.Status) {
+        switch (MetricsConfig.clusterStatus[cluster.status.Status]) {
+            case 0:
                 MetricsConfig.gClusterStatus.labels(cluster.team, cluster.name, status,  this._getBucketID(cluster)).set(1);
-            }
-        });
+                break;
+            case 1:
+            case 2:
+                MetricsConfig.gClusterStatus.labels(cluster.team, cluster.name, status,  this._getBucketID(cluster)).set(0.5);
+                break;
+            default:
+                MetricsConfig.gClusterStatus.labels(cluster.team, cluster.name, status,  this._getBucketID(cluster)).set(0);
+        }
     }
 
     _setClusterErrors(log) {
