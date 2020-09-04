@@ -1,4 +1,5 @@
 FROM mhart/alpine-node:10
+LABEL source_repository="https://github.com/sapcc/pope"
 
 # Create app directory
 WORKDIR /usr/src/app
